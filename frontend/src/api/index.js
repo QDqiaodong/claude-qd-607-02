@@ -63,11 +63,34 @@ export const inspectApi = {
   handle: (id, note) => http.post(`/inspections/${id}/handle`, { note })
 }
 
-/** 模块五：能耗记录 */
+/** 模块五：能耗记录（跨价段版本化计费） */
 export const energyApi = {
   search: (params) => http.get('/energy', { params }),
+  detail: (id) => http.get(`/energy/${id}`),
   summary: (month) => http.get('/energy/summary', { params: month ? { month } : {} }),
+  preview: (data) => http.post('/energy/preview', data),
   create: (data) => http.post('/energy', data)
+}
+
+/** 模块五：电价版本链（当前 / 未来 / 历史） */
+export const tariffApi = {
+  timeline: () => http.get('/tariffs'),
+  create: (data) => http.post('/tariffs', data),
+  update: (id, data) => http.put(`/tariffs/${id}`, data),
+  remove: (id) => http.delete(`/tariffs/${id}`)
+}
+
+/** 抄表计费口径 */
+export const BILLING_TYPE = {
+  LEGACY_FIXED: '历史固定',
+  VERSIONED: '跨价段'
+}
+
+/** 电价版本阶段 */
+export const TARIFF_PHASE = {
+  CURRENT: '当前版本',
+  FUTURE: '未来版本',
+  HISTORY: '历史版本'
 }
 
 /** 模块六：机柜停电检修隔离 */

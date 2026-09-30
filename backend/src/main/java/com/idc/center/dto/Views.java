@@ -1,13 +1,16 @@
 package com.idc.center.dto;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
 import com.idc.center.domain.Cabinet;
+import com.idc.center.domain.EnergyTariffSegment;
 import com.idc.center.domain.Isolation;
 import com.idc.center.domain.IsolationEvent;
 import com.idc.center.domain.ServerAsset;
+import com.idc.center.domain.TariffVersion;
 
 import lombok.Data;
 
@@ -147,6 +150,75 @@ public final class Views {
         private String cabinetCode;
         private BigDecimal usageKwh;
         private BigDecimal fee;
+    }
+
+    /** 电价版本（列表 / 时间轴用） */
+    @Data
+    public static class TariffVersionView {
+        private Long id;
+        private String name;
+        private LocalDate effectiveDate;
+        /** 生效区间结束日（含）；末个版本开放为 null */
+        private LocalDate endDate;
+        private BigDecimal basePrice;
+        private String billingNote;
+        private String enabledBy;
+        private LocalDateTime createdAt;
+        /** HISTORY 历史版本（生效区间已完全过去） / CURRENT 当前生效 / FUTURE 未来版本 */
+        private String phase;
+        /** 是否已被抄表分段快照引用（被引用后价格 / 生效日不可改动） */
+        private Boolean referenced;
+
+        public static TariffVersionView of(TariffVersion v, String phase, boolean referenced) {
+            TariffVersionView view = new TariffVersionView();
+            view.setId(v.getId());
+            view.setName(v.getName());
+            view.setEffectiveDate(v.getEffectiveDate());
+            view.setBasePrice(v.getBasePrice());
+            view.setBillingNote(v.getBillingNote());
+            view.setEnabledBy(v.getEnabledBy());
+            view.setCreatedAt(v.getCreatedAt());
+            view.setPhase(phase);
+            view.setReferenced(referenced);
+            return view;
+        }
+    }
+
+    /** 新增抄表前的分段计费预览（不落库，确认后明细与此完全一致） */
+    @Data
+    public static class TariffSegmentView {
+        private Long tariffVersionId;
+        private String tariffName;
+        private BigDecimal unitPrice;
+        private LocalDate segStart;
+        private LocalDate segEnd;
+        private Integer dayCount;
+        private BigDecimal allocKwh;
+        private BigDecimal segFee;
+    }
+
+    /** 新增抄表预览：区间信息 + 上期读数 + 预计用电量 + 各价段费用 */
+    @Data
+    public static class EnergyBillingPreview {
+        private Long cabinetId;
+        private LocalDate meterDate;
+        private LocalDate periodStart;
+        private BigDecimal previousReading;
+        private LocalDate previousMeterDate;
+        private BigDecimal meterReading;
+        private BigDecimal usageKwh;
+        private BigDecimal totalFee;
+        private List<TariffSegmentView> segments;
+        /** FIRST_RECORD 首条无上期读数（费用 0） / NORMAL 正常跨价段 */
+        private String kind;
+    }
+
+    /** 电价时间轴：版本视图链 + 当前版本 id + 今天 */
+    @Data
+    public static class TariffTimeline {
+        private LocalDate today;
+        private Long currentVersionId;
+        private List<TariffVersionView> versions;
     }
 
     /** 巡检页顶部汇总 */

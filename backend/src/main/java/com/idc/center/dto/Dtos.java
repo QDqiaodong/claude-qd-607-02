@@ -175,7 +175,7 @@ public final class Dtos {
         private String note;
     }
 
-    /** 新增能耗抄表 */
+    /** 新增能耗抄表（功能启用后不再手填电价：费用由电价版本链跨价段计算） */
     @Data
     public static class EnergyCreateReq {
         @NotNull(message = "请选择机柜")
@@ -184,7 +184,6 @@ public final class Dtos {
         private LocalDate meterDate;
         @NotNull(message = "请填写电表读数")
         private BigDecimal meterReading;
-        private BigDecimal unitPrice;
         private String meterReader;
         private String remark;
     }
@@ -200,6 +199,21 @@ public final class Dtos {
         private BigDecimal maxUsage;
         private int page = 0;
         private int size = 10;
+    }
+
+    /** 新增 / 调整电价版本 */
+    @Data
+    public static class TariffVersionReq {
+        @NotBlank(message = "请填写版本名称")
+        private String name;
+        @NotNull(message = "请选择生效日期")
+        private LocalDate effectiveDate;
+        @NotNull(message = "请填写基础单价")
+        private BigDecimal basePrice;
+        @NotBlank(message = "请填写计费说明")
+        private String billingNote;
+        @NotBlank(message = "请填写启用人")
+        private String enabledBy;
     }
 
     /** 新建停电检修隔离 */
