@@ -189,6 +189,21 @@ public final class Dtos {
         private String remark;
     }
 
+    /** 新增电价版本 */
+    @Data
+    public static class EnergyPriceVersionReq {
+        @NotBlank(message = "请填写版本名称")
+        private String name;
+        @NotNull(message = "请选择生效日期")
+        private LocalDate effectiveDate;
+        @NotNull(message = "请填写基础单价")
+        private BigDecimal baseUnitPrice;
+        @NotBlank(message = "请填写计费说明")
+        private String billingNote;
+        @NotBlank(message = "请填写启用人")
+        private String enabledBy;
+    }
+
     /** 能耗查询条件（走 Query by Example） */
     @Data
     public static class EnergyQuery {

@@ -1,10 +1,13 @@
 package com.idc.center.dto;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
 import com.idc.center.domain.Cabinet;
+import com.idc.center.domain.EnergyPriceSegment;
+import com.idc.center.domain.EnergyPriceVersion;
 import com.idc.center.domain.Isolation;
 import com.idc.center.domain.IsolationEvent;
 import com.idc.center.domain.ServerAsset;
@@ -147,6 +150,116 @@ public final class Views {
         private String cabinetCode;
         private BigDecimal usageKwh;
         private BigDecimal fee;
+    }
+
+    /** 电价版本列表项，endDate 在返回时动态算出，页面用于时间轴 */
+    @Data
+    public static class EnergyPriceVersionView {
+        private Long id;
+        private String name;
+        private LocalDate effectiveDate;
+        private LocalDate endDate;
+        private BigDecimal baseUnitPrice;
+        private String billingNote;
+        private String enabledBy;
+        private LocalDateTime createdAt;
+        /** HISTORY 历史 / CURRENT 当前 / FUTURE 未来 */
+        private String status;
+
+        public static EnergyPriceVersionView of(EnergyPriceVersion version, LocalDate endDate, String status) {
+            EnergyPriceVersionView view = new EnergyPriceVersionView();
+            view.setId(version.getId());
+            view.setName(version.getName());
+            view.setEffectiveDate(version.getEffectiveDate());
+            view.setEndDate(endDate);
+            view.setBaseUnitPrice(version.getBaseUnitPrice());
+            view.setBillingNote(version.getBillingNote());
+            view.setEnabledBy(version.getEnabledBy());
+            view.setCreatedAt(version.getCreatedAt());
+            view.setStatus(status);
+            return view;
+        }
+    }
+
+    /** 抄表记录中的一个价段快照 */
+    @Data
+    public static class EnergySegmentView {
+        private Long id;
+        private Integer segmentOrder;
+        private LocalDate startDate;
+        private LocalDate endDate;
+        private Integer dayCount;
+        private BigDecimal usageKwh;
+        private Long priceVersionId;
+        private String versionName;
+        private LocalDate effectiveDate;
+        private BigDecimal unitPrice;
+        private BigDecimal segmentFee;
+
+        public static EnergySegmentView of(EnergyPriceSegment segment) {
+            EnergySegmentView view = new EnergySegmentView();
+            view.setId(segment.getId());
+            view.setSegmentOrder(segment.getSegmentOrder());
+            view.setStartDate(segment.getStartDate());
+            view.setEndDate(segment.getEndDate());
+            view.setDayCount(segment.getDayCount());
+            view.setUsageKwh(segment.getUsageKwh());
+            view.setPriceVersionId(segment.getPriceVersionId());
+            view.setVersionName(segment.getVersionName());
+            view.setEffectiveDate(segment.getEffectiveDate());
+            view.setUnitPrice(segment.getUnitPrice());
+            view.setSegmentFee(segment.getSegmentFee());
+            return view;
+        }
+    }
+
+    /** 新增抄表前的计费预览，确认后原样固化 */
+    @Data
+    public static class EnergyRecordView {
+        private Long id;
+        private Long cabinetId;
+        private LocalDate meterDate;
+        private BigDecimal meterReading;
+        private LocalDate periodStart;
+        private BigDecimal usageKwh;
+        private BigDecimal unitPrice;
+        private BigDecimal fee;
+        private String meterReader;
+        private String remark;
+        private String billingType;
+        private List<EnergySegmentView> priceSegments;
+
+        public static EnergyRecordView of(com.idc.center.domain.EnergyRecord record,
+                                          List<EnergyPriceSegment> segments) {
+            EnergyRecordView view = new EnergyRecordView();
+            view.setId(record.getId());
+            view.setCabinetId(record.getCabinetId());
+            view.setMeterDate(record.getMeterDate());
+            view.setMeterReading(record.getMeterReading());
+            view.setPeriodStart(record.getPeriodStart());
+            view.setUsageKwh(record.getUsageKwh());
+            view.setUnitPrice(record.getUnitPrice());
+            view.setFee(record.getFee());
+            view.setMeterReader(record.getMeterReader());
+            view.setRemark(record.getRemark());
+            view.setBillingType(record.getBillingType());
+            view.setPriceSegments(segments == null ? List.of() : segments.stream().map(EnergySegmentView::of).toList());
+            return view;
+        }
+    }
+
+    @Data
+    public static class EnergyBillingPreview {
+        private Long cabinetId;
+        private LocalDate previousMeterDate;
+        private BigDecimal previousReading;
+        private LocalDate periodStart;
+        private LocalDate meterDate;
+        private BigDecimal meterReading;
+        private BigDecimal usageKwh;
+        private BigDecimal totalFee;
+        private Integer totalDays;
+        private List<EnergySegmentView> segments;
     }
 
     /** 巡检页顶部汇总 */

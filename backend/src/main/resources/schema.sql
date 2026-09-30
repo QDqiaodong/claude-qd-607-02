@@ -8,6 +8,8 @@
 --   3. idc_work_order           上架 / 下架 / 迁移工单（待审批→已批复→施工中→已完成）
 --   4. idc_inspection           巡检记录（温湿度、电源、异常描述、是否处理）
 --   5. idc_energy               能耗记录（抄表读数 → 用电量 → 电费）
+--      idc_energy_price_version 全站电价版本
+--      idc_energy_price_segment 版本化抄表账单分段快照
 --
 -- 种子数据对照：
 --   [M1] 机柜 U 位数差异        → C03 只有 32U，其余 42U
@@ -27,6 +29,8 @@ DROP TABLE IF EXISTS idc_isolation_event;
 DROP TABLE IF EXISTS idc_isolation_order;
 DROP TABLE IF EXISTS idc_isolation_server;
 DROP TABLE IF EXISTS idc_isolation;
+DROP TABLE IF EXISTS idc_energy_price_segment;
+DROP TABLE IF EXISTS idc_energy_price_version;
 DROP TABLE IF EXISTS idc_energy;
 DROP TABLE IF EXISTS idc_inspection;
 DROP TABLE IF EXISTS idc_work_order;
@@ -134,14 +138,49 @@ CREATE TABLE idc_energy (
     meter_date   DATE                   COMMENT '抄表日期',
     meter_reading DECIMAL(12,2)         COMMENT '电表读数（kWh，累计）',
     usage_kwh    DECIMAL(12,2)          COMMENT '本期用电量（kWh）',
-    unit_price   DECIMAL(6,3)           COMMENT '电价（元/kWh）',
+    billing_type VARCHAR(20)  NOT NULL DEFAULT 'LEGACY' COMMENT 'LEGACY 历史固定计费 / VERSIONED 版本化分段计费',
+    period_start DATE                   COMMENT '版本化计费区间起点（上次抄表日次日）',
+    unit_price   DECIMAL(10,4)          COMMENT '电价（元/kWh）；版本化记录为兼容列表的主展示价',
     fee          DECIMAL(12,2)          COMMENT '电费（元）',
     meter_reader VARCHAR(30)            COMMENT '抄表人',
     remark       VARCHAR(200)           COMMENT '备注',
     PRIMARY KEY (id),
+    UNIQUE KEY uk_energy_cabinet_date (cabinet_id, meter_date),
     KEY idx_energy_cabinet (cabinet_id),
-    KEY idx_energy_date (meter_date)
+    KEY idx_energy_date (meter_date),
+    KEY idx_energy_period (billing_type, period_start, meter_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='能耗记录';
+
+CREATE TABLE idc_energy_price_version (
+    id              BIGINT       NOT NULL AUTO_INCREMENT,
+    name            VARCHAR(50)  NOT NULL COMMENT '版本名称',
+    effective_date  DATE         NOT NULL COMMENT '生效日期（当天自然日起适用）',
+    base_unit_price DECIMAL(10,4) NOT NULL COMMENT '基础单价（元/kWh）',
+    billing_note    VARCHAR(300) NOT NULL COMMENT '计费说明',
+    enabled_by      VARCHAR(30)  NOT NULL COMMENT '启用人',
+    created_at      DATETIME              COMMENT '登记时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_energy_price_date (effective_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='全站电价版本';
+
+CREATE TABLE idc_energy_price_segment (
+    id               BIGINT        NOT NULL AUTO_INCREMENT,
+    energy_record_id BIGINT        NOT NULL COMMENT '抄表记录',
+    segment_order    INT           NOT NULL COMMENT '分段顺序，从 1 开始',
+    start_date       DATE          NOT NULL COMMENT '分段开始日期',
+    end_date         DATE          NOT NULL COMMENT '分段结束日期',
+    day_count        INT           NOT NULL COMMENT '该段自然日数',
+    usage_kwh        DECIMAL(12,2) NOT NULL COMMENT '按自然日分摊的用电量',
+    price_version_id BIGINT        NOT NULL COMMENT '电价版本ID快照',
+    version_name     VARCHAR(50)   NOT NULL COMMENT '版本名称快照',
+    effective_date   DATE          NOT NULL COMMENT '版本生效日快照',
+    unit_price       DECIMAL(10,4) NOT NULL COMMENT '采用单价快照',
+    segment_fee      DECIMAL(12,2) NOT NULL COMMENT '分段费用',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_energy_segment_order (energy_record_id, segment_order),
+    KEY idx_energy_segment_record (energy_record_id),
+    KEY idx_energy_segment_dates (start_date, end_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='能耗账单分段计费快照';
 
 -- ============================================================================
 -- 模块六：机柜停电检修隔离
@@ -434,6 +473,18 @@ INSERT INTO idc_energy (id, cabinet_id, meter_date, meter_reading, usage_kwh, un
     (34, 12, '2026-07-31', 2960.00, 0.00, 0.68, 0.00, '刘岩', '首期建账，无上期读数'),
     (35, 12, '2026-08-31', 3092.00, 132.00, 0.68, 89.76, '刘岩', '2026-08 月度抄表'),
     (36, 12, '2026-09-20', 3224.00, 132.00, 0.68, 89.76, '刘岩', '2026-09 月度抄表');
+
+-- ---------------------------- 电价版本 ----------------------------
+-- 旧能耗记录均为 LEGACY，固定保留原单价/费用；基线版本仅从功能启用后的第一条新抄表开始参与分段计费。
+-- 2026-10-01 为提前登记的未来版本，可用于演示新增抄表跨切换日，但不会回改历史费用。
+INSERT INTO idc_energy_price_version
+    (id, name, effective_date, base_unit_price, billing_note, enabled_by, created_at) VALUES
+    (1, '历史默认电价', '2026-01-01', 0.6800,
+     '基线单价。历史抄表记录保留原固定费用，不反推价段；新抄表按版本链进行自然日分段。',
+     '系统迁移', '2026-09-30 09:00:00'),
+    (2, '四季度调整电价', '2026-10-01', 0.7500,
+     '四季度基础单价调整为 0.7500 元/kWh；2026-10-01 起按自然日归入该价段。',
+     '王强', '2026-09-30 09:05:00');
 
 -- ---------------------------- 停电检修隔离 ----------------------------
 -- 历史已解除：B01 柜 UPS 电池组更换（生效时固定 3 台在架服务器，冻结 1 张迁移工单）

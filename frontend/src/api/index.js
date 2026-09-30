@@ -63,11 +63,14 @@ export const inspectApi = {
   handle: (id, note) => http.post(`/inspections/${id}/handle`, { note })
 }
 
-/** 模块五：能耗记录 */
+/** 模块五：能耗记录 / 电价版本 */
 export const energyApi = {
   search: (params) => http.get('/energy', { params }),
   summary: (month) => http.get('/energy/summary', { params: month ? { month } : {} }),
-  create: (data) => http.post('/energy', data)
+  priceVersions: () => http.get('/energy/price-versions'),
+  preview: (params) => http.get('/energy/preview', { params }),
+  create: (data) => http.post('/energy', data),
+  createPriceVersion: (data) => http.post('/energy/price-versions', data)
 }
 
 /** 模块六：机柜停电检修隔离 */
